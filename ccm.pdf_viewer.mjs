@@ -9,24 +9,33 @@ export const component = {
   name: "pdf_viewer",
   ccm: "././libs/framework/ccm.js",
   config: {
-    // Keep the display API, worker and auxiliary resources on the same PDF.js version.
+    /** PDF.js display API; keep it on the same version as the worker and auxiliary resources. */
     pdfjs: ["ccm.load", "././libs/pdfjs/pdf.min.mjs"],
     css: ["ccm.load", "././libs/pdfjs/pdf_viewer.css", "././resources/styles.css"],
     worker: "././libs/pdfjs/pdf.worker.min.mjs",
-    // Character maps, fallback fonts and image codecs are loaded by PDF.js as needed.
+    /** Character maps, fallback fonts and image codecs, loaded by PDF.js as needed. */
     cMaps: "././libs/pdfjs/cmaps/",
     fonts: "././libs/pdfjs/standard_fonts/",
     wasm: "././libs/pdfjs/wasm/",
 
-    pdf: "././resources/demo.pdf", // PDF URL, relative to the embedding page or absolute (requires CORS across origins).
-    password: "", // Optional initial PDF password; otherwise ask in the viewer when needed.
-    rememberPassword: true, // Remember successful form entries per PDF URL in sessionStorage (same tab/origin).
-    links: true, // Enable existing internal and external PDF links.
-    download: true, // Offer downloading; this is not copy protection.
-    textSelection: true, // Select and copy existing PDF text (no OCR).
-    page: 1, // Initial page, counted from 1; clamped to the document's page range.
-    zoom: "page-width", // "page-width" or a number from 0.25 to 4 (1 = 100%).
-    filename: "document.pdf", // Suggested download filename.
+    /** PDF URL, relative to the embedding page or absolute (requires CORS across origins). */
+    pdf: "././resources/demo.pdf",
+    /** Optional initial PDF password; otherwise ask in the viewer when needed. */
+    password: "",
+    /** Remember successful form entries per PDF URL in sessionStorage (same tab/origin). */
+    rememberPassword: true,
+    /** Enable existing internal and external PDF links. */
+    links: true,
+    /** Offer downloading; this is not copy protection. */
+    download: true,
+    /** Select and copy existing PDF text (no OCR). */
+    textSelection: true,
+    /** Initial page, counted from 1; clamped to the document's page range. */
+    page: 1,
+    /** "page-width" or a number from 0.25 to 4 (1 = 100%). */
+    zoom: "page-width",
+    /** Suggested download filename. */
+    filename: "document.pdf",
     labels: {
       viewer: "PDF-Viewer", previous: "Zurück", next: "Weiter", page: "Seite", of: "von",
       zoomOut: "Verkleinern", zoomIn: "Vergrößern", fit: "Breite anpassen", download: "Herunterladen",
@@ -38,16 +47,41 @@ export const component = {
       passwordCancelled: "Das Öffnen des PDFs wurde abgebrochen.",
       invalidPage: "Bitte eine gültige Seitenzahl eingeben.", link: "Link im PDF",
     },
-    // Functions or ["ccm.load", "./extensions.mjs#name"], called sequentially with { app, type }.
+    /** Functions or ["ccm.load", "./extensions.mjs#name"], called sequentially with { app, type }. */
     extensions: [],
   },
   Instance: function () {
-    // `document` is the PDF.js document proxy, not the browser DOM document.
-    // `active` tracks the running action for destroy(); `ui` holds persistent DOM references.
-    let document, loadingTask, observer, active, ui, resizePending = false, closing = false;
-    // Password callbacks exist only while PDF.js waits for user input.
-    let cancelPassword, passwordForm, passwordCancelled = false;
-    // Blob URL -> revocation timer; release() also revokes outstanding downloads.
+    /** Loaded PDF.js document proxy, distinct from the browser DOM document. */
+    let document;
+
+    /** PDF.js loading task; owns the worker and is destroyed when releasing the document. */
+    let loadingTask;
+
+    /** Watches the viewport width to update fit-to-width rendering. */
+    let observer;
+
+    /** Current action promise, awaited by destroy() before releasing resources. */
+    let active;
+
+    /** Persistent control and viewport DOM references, rebuilt by buildUI(). */
+    let ui;
+
+    /** Records a resize during an action so it can be processed after the busy lock is released. */
+    let resizePending = false;
+
+    /** Prevents new actions while destroy() waits for active work and releases resources. */
+    let closing = false;
+
+    /** Cancels the pending PDF.js password request; cleared when the prompt is removed. */
+    let cancelPassword;
+
+    /** Currently displayed password form, removed after submission, cancellation or cleanup. */
+    let passwordForm;
+
+    /** Distinguishes an intentional password cancellation from a document-loading failure. */
+    let passwordCancelled = false;
+
+    /** Blob URL -> revocation timer; release() also revokes outstanding downloads. */
     const downloads = new Map();
     /** Transient interaction lock; a password prompt remains usable while busy. */
     this.gui = { busy: false };
@@ -63,7 +97,9 @@ export const component = {
       for (const extension of [].concat(this.extensions || []))
         if (extension) await extension({ app: this, type });
     };
+    /** Forward the ccm initialization lifecycle to extensions. */
     this.init = async () => this.emit("init");
+    /** Forward the ccm ready lifecycle to extensions. */
     this.ready = async () => this.emit("ready");
     /** Return a detached state snapshot without PDF.js objects or passwords. */
     this.getValue = () => this.state ? { ...this.state } : null;
@@ -124,7 +160,7 @@ export const component = {
       // Fragments identify a view within the same PDF; query parameters may identify another PDF.
       passwordUrl.hash = "";
       const passwordKey = `ccm.pdf_viewer.password:${passwordUrl.href}`;
-      // Storage can be unavailable in embedded/private contexts; opening the PDF must still work.
+      /** Access optional session storage; unavailable storage must not prevent opening the PDF. */
       const storedPassword = (operation, value) => {
         if (!this.rememberPassword) return null;
         try { return window.sessionStorage[operation](passwordKey, value); }
@@ -265,7 +301,9 @@ export const component = {
       if (!Number.isFinite(zoom) || zoom < 0.25 || zoom > 4) throw new RangeError("Zoom must be page-width or 0.25–4.");
       return zoom;
     }
-    const handle = (promise) => { promise.catch(() => {}); }; // run already reports errors through UI and extensions.
+    /** Consume DOM-handler rejections already reported by run() through the UI and extensions. */
+    const handle = (promise) => { promise.catch(() => {}); };
+    /** Re-render after resizing only when the current mode follows the available width. */
     const fitAfterResize = () => {
       if (document && this.state?.zoom === "page-width" && !closing) handle(this.setZoom("page-width"));
     };
@@ -321,6 +359,7 @@ export const component = {
       const root = node("section", "pdf-viewer");
       root.setAttribute("aria-label", this.labels.viewer);
       const toolbar = node("div", "toolbar");
+      /** Append a toolbar button whose action uses the shared error-reporting path. */
       const button = (label, action) => {
         const element = node("button", "", label);
         element.type = "button";
