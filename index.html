@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ccmjs PDF Viewer</title>
+  <style>
+    body { margin: 0; background: #eaf0f6; color: #172b43; font: 16px/1.6 system-ui, sans-serif; }
+    main { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+    h1 { margin-bottom: 0; } p { margin-top: 8px; }
+    nav { margin-bottom: 16px; } a { color: #2463ce; }
+  </style>
+  <script src="./libs/framework/ccm.js"></script>
+</head>
+<body>
+  <main>
+    <h1>PDF Viewer</h1>
+    <p>A ccmjs component with page navigation, zoom, and optional PDF interactions.</p>
+    <nav aria-label="Demo selection">
+      <a href="./index.html">Standard PDF</a> ·
+      <a href="./index.html?demo=protected">Password-protected PDF</a>
+    </nav>
+    <p id="password-hint" hidden>Demo password: <code>viewer-test</code></p>
+    <div id="viewer"></div>
+  </main>
+  <script type="module">
+    try {
+      // Select only known exports; the URL never supplies an arbitrary module path.
+      const protectedDemo = new URLSearchParams(location.search).get("demo") === "protected";
+      document.querySelector("#password-hint").hidden = !protectedDemo;
+      // start() stays pending while the protected demo waits for a password.
+      await ccm.start("./ccm.pdf_viewer.mjs",
+        ["ccm.load", `./resources/configs.mjs#${protectedDemo ? "protectedDemo" : "demo"}`],
+        document.querySelector("#viewer"));
+    } catch (error) {
+      console.error(error);
+    }
+  </script>
+</body>
+</html>

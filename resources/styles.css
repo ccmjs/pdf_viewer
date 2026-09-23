@@ -1,0 +1,37 @@
+/* Component styles loaded alongside the upstream PDF.js text-layer stylesheet.
+   Layout classes are created in buildUI(); page/overlay classes are created in render(). */
+:host { display: block; min-width: 0; }
+.pdf-viewer { color: #172b43; background: #f4f6f9; border: 1px solid #dce2e9; border-radius: 12px;
+  overflow: hidden; font: 15px/1.5 system-ui, sans-serif; }
+.pdf-viewer * { box-sizing: border-box; }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px; background: white;
+  border-bottom: 1px solid #dce2e9; }
+.toolbar button, .toolbar input { font: inherit; color: inherit; border: 1px solid #c2ccda;
+  border-radius: 6px; background: white; padding: 7px 10px; }
+.toolbar button { cursor: pointer; }
+.toolbar button:hover:not(:disabled) { background: #eaf2ff; border-color: #396bc2; }
+.toolbar :disabled { opacity: .45; cursor: default; }
+.toolbar :focus-visible, .viewport:focus-visible, .pdf-link:focus-visible { outline: 3px solid #2463ce; outline-offset: 2px; }
+.page-form { display: flex; align-items: center; gap: 6px; margin: 0; }
+.page-form input { width: 5.5em; }
+.zoom-value { min-width: 4em; text-align: center; font-variant-numeric: tabular-nums; }
+.status { padding: 0 16px; margin: 8px 0; }
+.status:empty { display: none; }
+/* Outside the toolbar so password entry stays enabled while document loading is busy. */
+.password-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px 16px; }
+.password-form input, .password-form button { font: inherit; color: inherit; padding: 7px 10px;
+  border: 1px solid #c2ccda; border-radius: 6px; background: white; max-width: 100%; }
+.password-form button { cursor: pointer; }
+.password-form :focus-visible { outline: 3px solid #2463ce; outline-offset: 2px; }
+/* Reserve scrollbar space before the first page is measured for fit-to-width.
+   Keep 16px horizontal padding in sync with render()'s 32px width deduction. */
+.viewport { overflow: auto; scrollbar-gutter: stable; max-height: 80vh; min-height: 160px; padding: 16px; }
+/* PDF.js text-layer sizing uses these defaults plus the scale values set by render(). */
+.pdf-page { position: relative; margin: 0 auto; background: white; box-shadow: 0 2px 12px #172b4320;
+  --min-font-size: 1; --user-unit: 1; --scale-round-x: 1px; --scale-round-y: 1px; }
+.pdf-page canvas { display: block; }
+/* Let selections reach the text layer except within an actual clickable link rectangle. */
+.link-layer { position: absolute; inset: 0; pointer-events: none; }
+.pdf-link { position: absolute; display: block; pointer-events: auto; }
+.pdf-link:hover { background: #2463ce18; }
+@media (max-width: 480px) { .toolbar { gap: 6px; padding: 8px; } .toolbar button { padding: 7px; } }
