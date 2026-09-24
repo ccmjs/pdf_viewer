@@ -55,6 +55,7 @@ Configuration is also documented directly in `ccm.pdf_viewer.mjs`.
 | `links` | `true` | Enable existing external and internal PDF links. External links open a new tab. |
 | `download` | `true` | Show the download button and enable `downloadPdf()`. |
 | `textSelection` | `true` | Allow selection/copying through PDF.js's text layer. |
+| `navigation` | `true` | Show page controls and enable arrow-key navigation. Set to `false` when an embedding component controls the sequence. `goToPage()` remains available. |
 | `page` | `1` | Initial page, clamped to the document's range. |
 | `zoom` | `"page-width"` | Fit available width, or a number between `0.25` and `4`. `1` means 100%. |
 | `filename` | `"document.pdf"` | Suggested filename for downloading the original PDF. |

@@ -31,6 +31,8 @@ export const component = {
     textSelection: true,
     /** Initial page, counted from 1; clamped to the document's page range. */
     page: 1,
+    /** Show page controls and enable arrow-key navigation (embedding apps can own navigation). */
+    navigation: true,
     /** "page-width" or a number from 0.25 to 4 (1 = 100%). */
     zoom: "page-width",
     /** Suggested download filename. */
@@ -398,6 +400,7 @@ export const component = {
       });
       toolbar.append(form);
       const next = button(this.labels.next, () => this.goToPage(this.state.page + 1));
+      previous.hidden = form.hidden = next.hidden = !this.navigation;
       const out = button("−", () => this.setZoom(Math.max(0.25, this.state.scale / 1.25)));
       out.setAttribute("aria-label", this.labels.zoomOut);
       const zoom = node("output", "zoom-value");
@@ -412,8 +415,9 @@ export const component = {
       const viewport = node("div", "viewport");
       viewport.tabIndex = 0;
       viewport.setAttribute("aria-label", this.labels.viewer);
-      viewport.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight");
+      if (this.navigation) viewport.setAttribute("aria-keyshortcuts", "ArrowLeft ArrowRight");
       root.addEventListener("keydown", (event) => {
+        if (!this.navigation) return;
         if (!["ArrowLeft", "ArrowRight"].includes(event.key) || event.defaultPrevented ||
           event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
         const target = event.target;
