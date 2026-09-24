@@ -204,7 +204,9 @@ the width calculation in `render()`. PDF.js CSS variables also control text-laye
 alignment; keep them in sync with canvas scaling and PDF user units.
 
 The bundled libraries are upstream code, not places for component-specific changes.
-See [the dependency guide](libs/README.md) for their roles and update procedure.
+When updating PDF.js, replace its display API, worker, styles and auxiliary assets
+from the same upstream release and retain all license notices. Then run the browser
+tests and check text/link alignment with representative PDFs.
 
 ## Scope
 

@@ -175,7 +175,6 @@ export const component = {
         scale: 1,
       };
       await this.emit("loaded");
-      await render(this.state.page, this.state.zoom);
       let lastWidth = ui.viewport.clientWidth;
       // Height changes while swapping pages must not start a resize/render feedback loop.
       observer = new ResizeObserver(() => {
@@ -186,6 +185,8 @@ export const component = {
         else fitAfterResize();
       });
       observer.observe(ui.viewport);
+      // Observe before rendering so layout changes during the first page are not missed.
+      await render(this.state.page, this.state.zoom);
       await this.emit("start");
     });
 

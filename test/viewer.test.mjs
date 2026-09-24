@@ -122,6 +122,23 @@ test("PDF viewer: real rendering, navigation, options, extensions and lifecycle"
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForFunction(() => !app.gui.busy && app.element.querySelector("canvas").getBoundingClientRect().width < 390);
     await page.screenshot({ path: join(tmpdir(), "pdf-viewer-mobile.png") });
+    // A host can change size during the initial render (e.g. an embedding layout settles).
+    await page.evaluate(async () => {
+      app.element.style.width = "600px";
+      let resized = false;
+      const resizeOnRender = ({ type }) => {
+        if (type !== "render" || resized) return;
+        resized = true;
+        app.element.style.width = "340px";
+      };
+      app.extensions.push(resizeOnRender);
+      await app.start();
+      app.extensions.pop();
+    });
+    await page.waitForFunction(() => {
+      const viewport = app.element.querySelector(".viewport");
+      return !app.gui.busy && viewport.scrollWidth <= viewport.clientWidth;
+    }, null, { timeout: 3000 });
     // This deliberate 404 verifies recovery from loading failures on the same instance.
     await page.evaluate(async () => { app.pdf = "./resources/missing.pdf"; try { await app.start(); } catch {} });
     assert.match(await page.locator(".status").innerText(), /nicht geladen/);
