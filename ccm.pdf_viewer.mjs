@@ -25,6 +25,8 @@ export const component = {
     rememberPassword: true,
     /** Enable existing internal and external PDF links. */
     links: true,
+    /** Optional async ({ app, page }) handler for internal PDF links; owns navigation when set. */
+    onLink: null,
     /** Offer downloading; this is not copy protection. */
     download: true,
     /** Select and copy existing PDF text (no OCR). */
@@ -529,22 +531,28 @@ export const component = {
     };
 
     /** Resolve named/explicit destinations or supported page actions; preserve the user's zoom. */
-    const followLink = (annotation) => this.run(async () => {
-      let number;
-      if (annotation.dest) {
-        const destination = typeof annotation.dest === "string"
-          ? await document.getDestination(annotation.dest) : annotation.dest;
-        if (!destination) return;
-        // PDF destinations use zero-based indices or indirect page references; our API is one-based.
-        number = Number.isInteger(destination[0]) ? destination[0] + 1
-          : await document.getPageIndex(destination[0]) + 1;
-      } else {
-        number = { NextPage: this.state.page + 1, PrevPage: this.state.page - 1,
-          FirstPage: 1, LastPage: document.numPages }[annotation.action];
-      }
-      if (!Number.isInteger(number) || number < 1 || number > document.numPages) return;
-      await render(number, this.state.zoom);
-      await this.emit("page");
-    });
+    const followLink = async (annotation) => {
+      const navigation = await this.run(async () => {
+        let number;
+        if (annotation.dest) {
+          const destination = typeof annotation.dest === "string"
+            ? await document.getDestination(annotation.dest) : annotation.dest;
+          if (!destination) return;
+          // PDF destinations use zero-based indices or indirect page references; our API is one-based.
+          number = Number.isInteger(destination[0]) ? destination[0] + 1
+            : await document.getPageIndex(destination[0]) + 1;
+        } else {
+          number = { NextPage: this.state.page + 1, PrevPage: this.state.page - 1,
+            FirstPage: 1, LastPage: document.numPages }[annotation.action];
+        }
+        if (!Number.isInteger(number) || number < 1 || number > document.numPages) return;
+        if (typeof this.onLink === "function") return { handler: this.onLink, page: number, source: document };
+        await render(number, this.state.zoom);
+        await this.emit("page");
+      });
+      // Release the viewer's action lock before the host calls goToPage().
+      if (navigation && navigation.source === document && !closing)
+        await navigation.handler({ app: this, page: navigation.page });
+    };
   },
 };

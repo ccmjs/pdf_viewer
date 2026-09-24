@@ -53,6 +53,7 @@ Configuration is also documented directly in `ccm.pdf_viewer.mjs`.
 | `password` | `""` | Optional initial PDF password. Missing or incorrect passwords trigger an in-viewer prompt. |
 | `rememberPassword` | `true` | Reuse successful form entries from sessionStorage for the same PDF URL. Set to `false` to disable reading and writing cached passwords. |
 | `links` | `true` | Enable existing external and internal PDF links. External links open a new tab. |
+| `onLink` | `null` | Optional async `({ app, page })` callback for internal PDF links. Receives the resolved one-based page and replaces default navigation. Called after releasing the viewer lock, so the host can await `app.goToPage(page)`. External links remain unchanged. |
 | `download` | `true` | Show the download button and enable `downloadPdf()`. |
 | `textSelection` | `true` | Allow selection/copying through PDF.js's text layer. |
 | `navigation` | `true` | Show page controls and enable arrow-key navigation. Set to `false` when an embedding component controls the sequence. `goToPage()` remains available. |
