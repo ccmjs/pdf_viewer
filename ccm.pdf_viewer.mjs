@@ -17,7 +17,6 @@ export const component = {
     cMaps: "././libs/pdfjs/cmaps/",
     fonts: "././libs/pdfjs/standard_fonts/",
     wasm: "././libs/pdfjs/wasm/",
-
     /** PDF URL, relative to the embedding page or absolute (requires CORS across origins). */
     pdf: "././resources/demo.pdf",
     /** Optional initial PDF password; otherwise ask in the viewer when needed. */
@@ -47,7 +46,7 @@ export const component = {
       passwordCancelled: "Das Öffnen des PDFs wurde abgebrochen.",
       invalidPage: "Bitte eine gültige Seitenzahl eingeben.", link: "Link im PDF",
     },
-    /** Functions or ["ccm.load", "./extensions.mjs#name"], called sequentially with { app, type }. */
+    /** Functions or `["ccm.load", "./extensions.mjs#name"]`, called sequentially with `{ app, type }`. */
     extensions: [],
   },
   Instance: function () {
@@ -60,16 +59,16 @@ export const component = {
     /** Watches the viewport width to update fit-to-width rendering. */
     let observer;
 
-    /** Current action promise, awaited by destroy() before releasing resources. */
+    /** Current action promise, awaited by `destroy()` before releasing resources. */
     let active;
 
-    /** Persistent control and viewport DOM references, rebuilt by buildUI(). */
+    /** Persistent control and viewport DOM references, rebuilt by `buildUI()`. */
     let ui;
 
     /** Records a resize during an action so it can be processed after the busy lock is released. */
     let resizePending = false;
 
-    /** Prevents new actions while destroy() waits for active work and releases resources. */
+    /** Prevents new actions while `destroy()` waits for active work and releases resources. */
     let closing = false;
 
     /** Cancels the pending PDF.js password request; cleared when the prompt is removed. */
@@ -81,61 +80,25 @@ export const component = {
     /** Distinguishes an intentional password cancellation from a document-loading failure. */
     let passwordCancelled = false;
 
-    /** Blob URL -> revocation timer; release() also revokes outstanding downloads. */
+    /** Blob URL -> revocation timer; `release()` also revokes outstanding downloads. */
     const downloads = new Map();
-    /** Transient interaction lock; a password prompt remains usable while busy. */
-    this.gui = { busy: false };
+
     /** @type {{page: number, pages: number, zoom: number|string, scale: number}|null}
-     * One-based page numbers; zoom is the requested mode, scale the effective numeric zoom.
+     * One-based page numbers; `zoom` is the requested mode, `scale` the effective numeric zoom.
      */
     this.state = null;
+
+    /** Transient interaction lock; a password prompt remains usable while busy. */
+    this.gui = { busy: false };
+
     /** Most recent action error, cleared at the beginning of the next accepted action. */
     this.error = null;
 
-    /** Await extensions in config order. A rejection aborts the remaining extensions. */
-    this.emit = async (type) => {
-      for (const extension of [].concat(this.extensions || []))
-        if (extension) await extension({ app: this, type });
-    };
-    /** Forward the ccm initialization lifecycle to extensions. */
+    /** Forward the ccmjs initialization lifecycle to extensions. */
     this.init = async () => this.emit("init");
-    /** Forward the ccm ready lifecycle to extensions. */
-    this.ready = async () => this.emit("ready");
-    /** Return a detached state snapshot without PDF.js objects or passwords. */
-    this.getValue = () => this.state ? { ...this.state } : null;
 
-    /**
-     * Run one action under an interaction lock; overlapping requests resolve without running.
-     * Failures update the UI, emit error and reject. Finally always releases the lock and
-     * processes a deferred resize. This is a gate, not a queue of navigation requests.
-     * @param {Function} action Async work, including its extension events.
-     * @returns {Promise<*>} The action result, or undefined when ignored.
-     */
-    this.run = (action) => {
-      if (this.gui.busy || closing) return Promise.resolve();
-      this.gui.busy = true;
-      updateControls();
-      active = (async () => {
-        try {
-          this.error = null;
-          if (ui) ui.status.textContent = "";
-          return await action();
-        } catch (error) {
-          this.error = error;
-          if (ui) ui.status.textContent = error.name === "PasswordException" ? this.labels.password : this.labels.error;
-          await this.emit("error");
-          throw error;
-        } finally {
-          this.gui.busy = false;
-          updateControls();
-          if (resizePending && !closing) {
-            resizePending = false;
-            queueMicrotask(fitAfterResize);
-          }
-        }
-      })();
-      return active;
-    };
+    /** Forward the ccmjs ready lifecycle to extensions. */
+    this.ready = async () => this.emit("ready");
 
     /**
      * Release the previous document and load the current config. Remains pending during
@@ -227,6 +190,39 @@ export const component = {
     });
 
     /**
+     * Run one action under an interaction lock; overlapping requests resolve without running.
+     * Failures update the UI, emit error and reject. Finally always releases the lock and
+     * processes a deferred resize. This is a gate, not a queue of navigation requests.
+     * @param {Function} action Async work, including its extension events.
+     * @returns {Promise<*>} The action result, or undefined when ignored.
+     */
+    this.run = (action) => {
+      if (this.gui.busy || closing) return Promise.resolve();
+      this.gui.busy = true;
+      updateControls();
+      active = (async () => {
+        try {
+          this.error = null;
+          if (ui) ui.status.textContent = "";
+          return await action();
+        } catch (error) {
+          this.error = error;
+          if (ui) ui.status.textContent = error.name === "PasswordException" ? this.labels.password : this.labels.error;
+          await this.emit("error");
+          throw error;
+        } finally {
+          this.gui.busy = false;
+          updateControls();
+          if (resizePending && !closing) {
+            resizePending = false;
+            queueMicrotask(fitAfterResize);
+          }
+        }
+      })();
+      return active;
+    };
+
+    /**
      * Navigate to a one-based integer page; numeric input strings are accepted.
      * Invalid requests reject without changing the visible page. Same-page requests do nothing.
      * @param {number|string} page Target page number.
@@ -241,6 +237,7 @@ export const component = {
       await render(page, this.state.zoom);
       await this.emit("page");
     });
+
     /** @param {number|"page-width"} zoom Numeric zoom (0.25–4) or responsive width fitting.
      * @returns {Promise<void>} Resolves after render and zoom extensions.
      */
@@ -249,6 +246,7 @@ export const component = {
       await render(this.state.page, validZoom(zoom));
       await this.emit("zoom");
     });
+
     /** Request a download of the original bytes, retaining encryption; no-op when disabled. */
     this.downloadPdf = () => this.run(async () => {
       if (!this.download || !document) return;
@@ -284,6 +282,12 @@ export const component = {
       } finally { closing = false; }
     };
 
+    /** Await extensions in config order. A rejection aborts the remaining extensions. */
+    this.emit = async (type) => {
+      for (const extension of [].concat(this.extensions || []))
+        if (extension) await extension({ app: this, type });
+    };
+
     /** Dispose document-owned resources; caller owns visible UI/state and lifecycle events. */
     async function release() {
       clearPasswordForm();
@@ -295,18 +299,22 @@ export const component = {
       for (const [url, timer] of downloads) { clearTimeout(timer); URL.revokeObjectURL(url); }
       downloads.clear();
     }
+
     /** Validate explicit zoom without coercion; unlike initial page numbers, zoom is not clamped. */
     function validZoom(zoom) {
       if (zoom === "page-width") return zoom;
       if (!Number.isFinite(zoom) || zoom < 0.25 || zoom > 4) throw new RangeError("Zoom must be page-width or 0.25–4.");
       return zoom;
     }
+
     /** Consume DOM-handler rejections already reported by run() through the UI and extensions. */
     const handle = (promise) => { promise.catch(() => {}); };
+
     /** Re-render after resizing only when the current mode follows the available width. */
     const fitAfterResize = () => {
       if (document && this.state?.zoom === "page-width" && !closing) handle(this.setZoom("page-width"));
     };
+
     /** Build DOM with textContent so labels and PDF-derived strings are never treated as markup. */
     const node = (tag, className, text) => {
       const element = window.document.createElement(tag);
@@ -314,12 +322,14 @@ export const component = {
       if (text !== undefined) element.textContent = text;
       return element;
     };
+
     /** Forget prompt controls/callbacks; does not itself settle the PDF.js password request. */
     const clearPasswordForm = () => {
       passwordForm?.remove();
       passwordForm = null;
       cancelPassword = null;
     };
+
     /** Resume the existing loading task directly: run() is still locked by start(). */
     const showPasswordForm = (updatePassword, reason) => {
       passwordForm?.remove();
@@ -354,6 +364,7 @@ export const component = {
       ui.viewport.before(form);
       input.focus();
     };
+
     /** Rebuild persistent controls on start; render() subsequently replaces only viewport content. */
     const buildUI = () => {
       const root = node("section", "pdf-viewer");
@@ -420,6 +431,7 @@ export const component = {
       ui = { root, toolbar, previous, next, input, count, zoom, out, plus, viewport, status };
       updateControls();
     };
+
     /** Combine the action lock with page/zoom boundaries; leave password controls enabled. */
     const updateControls = () => {
       if (!ui) return;
@@ -436,6 +448,7 @@ export const component = {
       ui.count.textContent = ` ${this.labels.of} ${this.state.pages}`;
       ui.zoom.textContent = `${Math.round(this.state.scale * 100)} %`;
     };
+
     /**
      * Build one complete page off-DOM, then commit it and its state together before emitting render.
      * Call only inside run(). A layer failure preserves the previous visible page and state.
@@ -509,6 +522,7 @@ export const component = {
       ui.status.textContent = "";
       await this.emit("render");
     };
+
     /** Resolve named/explicit destinations or supported page actions; preserve the user's zoom. */
     const followLink = (annotation) => this.run(async () => {
       let number;

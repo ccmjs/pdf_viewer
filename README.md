@@ -77,7 +77,7 @@ await viewer.goToPage(3);        // One-based integer; rejects out-of-range inpu
 await viewer.setZoom(1.25);     // 125%
 await viewer.setZoom("page-width");
 await viewer.downloadPdf();     // No-op if download is disabled
-const state = viewer.getValue(); // { page, pages, zoom, scale }, or null
+const state = viewer.state; // { page, pages, zoom, scale }, or null
 
 viewer.pdf = "./another.pdf";
 await viewer.start();           // Release old PDF and load the new configuration
@@ -90,7 +90,7 @@ rejections after showing a status message. `error` contains the original error.
 `destroy()` cancels a pending password prompt and waits for the current action;
 an instance can be started again afterwards.
 
-`getValue()` returns a copy of the state, with these fields:
+`viewer.state` exposes the current state directly, with these fields:
 
 | Field | Meaning |
 | --- | --- |
@@ -116,7 +116,7 @@ To retain access to the instance during that wait, use `ccm.instance()` followed
 by `instance.start()`.
 
 Passwords entered in the form are cleared after submission and are not copied to
-`config`, `state`, `getValue()` or extension events. A password explicitly supplied
+`config`, `state` or extension events. A password explicitly supplied
 in configuration remains part of that configuration and is visible to page code.
 By default, successful form entries are kept in `sessionStorage` per absolute PDF
 URL (excluding the fragment), scoped to the embedding origin and browser tab.
@@ -138,12 +138,12 @@ Downloads retain the original PDF's encryption.
 ## Extensions
 
 Extensions receive **`{ app, type }`**, are awaited in configuration order and can
-read `app.state`, `app.error`, `app.element` and `app.getValue()`. There is no `onaction` callback.
+read `app.state`, `app.error` and `app.element`. There is no `onaction` callback.
 
 ```js
 export async function rememberPage({ app, type }) {
   if (type === "page") {
-    console.log("Current page:", app.getValue().page);
+    console.log("Current page:", app.state.page);
   }
 }
 ```
