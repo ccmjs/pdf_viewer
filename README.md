@@ -21,7 +21,6 @@ Opening the HTML directly with `file://` is not supported by browser module/work
 
 ```html
 <script src="./libs/framework/ccm-28.0.0.min.js"></script>
-<div id="pdf"></div>
 <script type="module">
   const viewer = await ccm.start("./ccm.pdf_viewer.mjs", {
     pdf: "./resources/demo.pdf",
@@ -30,7 +29,7 @@ Opening the HTML directly with `file://` is not supported by browser module/work
     textSelection: true,
     page: 1,
     zoom: "page-width",
-  }, document.querySelector("#pdf"));
+  }, document.body);
 </script>
 ```
 
@@ -42,6 +41,32 @@ process replaces these prefixes with absolute GitHub Pages URLs for published ve
 The configured PDF URL is relative to the embedding page unless absolute.
 Cross-origin servers must allow CORS.
 Dependencies are declared via `ccm.load`; no npm install or build is needed to use the viewer.
+
+## 📦 Usage with CDN (versioned)
+
+```html
+<script
+    src="https://cdn.jsdelivr.net/gh/ccmjs/pdf_viewer@v1.0.0/libs/framework/ccm-28.0.0.min.js"
+    integrity="sha384-HDMeDDgKlR2OFJ3ECMwmA6wknqpfpeCiSZYlUhQaFg9FKrvHJp8MMSwrxibvWJ2G"
+    crossorigin="anonymous"
+></script>
+<script type="module">
+  const viewer = await ccm.start(
+      "https://cdn.jsdelivr.net/gh/ccmjs/pdf_viewer@v1.0.0/ccm.pdf_viewer-1.0.0.min.mjs#sha384-1NwNCUojyNg7BPq0Odf5LRpb3kJ1qlCXpZHd1vHHHYNzm4AONSwujk5CH5TFcDlE",
+      {},
+      document.body
+  );
+</script>
+```
+
+Place this example inside the document body. It uses the default configuration,
+including the bundled demo PDF and German labels. Set `pdf` in the configuration
+to display your own document. No local copy of the component or its libraries is needed.
+
+The framework script uses the browser's `integrity` attribute; ccmjs verifies the
+component using the `#sha384-…` URL fragment. These hashes cover the framework and
+component files, respectively, not every resource loaded by the viewer.
+Update the component URL and its integrity hash together when changing versions.
 
 ## Configuration
 
