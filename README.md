@@ -20,7 +20,7 @@ on the first visit in a tab.
 Opening the HTML directly with `file://` is not supported by browser module/worker loading.
 
 ```html
-<script src="./libs/framework/ccm.js"></script>
+<script src="./libs/framework/ccm-28.0.0.min.js"></script>
 <div id="pdf"></div>
 <script type="module">
   const viewer = await ccm.start("./ccm.pdf_viewer.mjs", {
