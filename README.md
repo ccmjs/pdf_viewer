@@ -12,7 +12,7 @@ first and last page.
 ## Quick start
 
 Serve this repository over HTTP(S) and open `index.html` for the three-page demo.
-Choose **Password-protected PDF** (or open `index.html?demo=protected`) to test
+Choose **Password-protected PDF** (or open `index.html?demo=protected`) to open
 the password prompt. Its password is **`viewer-test`**. Both English configurations
 are exported from `resources/configs.mjs` as `demo` and `protectedDemo`; the latter
 loads `resources/protected.pdf` without a preset password so the prompt is shown
@@ -187,7 +187,6 @@ The private PDF.js document proxy is not exposed to extensions.
 | `resources/configs.mjs` | Standard and protected demo configurations, including English labels. |
 | `resources/styles.css` | Component layout and link overlay; complements PDF.js's text-layer CSS. |
 | `resources/demo.pdf`, `resources/protected.pdf` | Three-page English examples with external and internal links. |
-| `test/viewer.test.mjs` | Browser integration test against the real framework, worker and PDFs. |
 | `libs/framework/` | Bundled ccmjs 28.0.0 and its MIT license. |
 | `libs/pdfjs/` | Unmodified PDF.js distribution files, auxiliary assets and upstream notices. |
 | `LICENSE` | MIT license for this component. |
@@ -207,8 +206,7 @@ alignment; keep them in sync with canvas scaling and PDF user units.
 
 The bundled libraries are upstream code, not places for component-specific changes.
 When updating PDF.js, replace its display API, worker, styles and auxiliary assets
-from the same upstream release and retain all license notices. Then run the browser
-tests and check text/link alignment with representative PDFs.
+from the same upstream release and retain all license notices.
 
 ## Scope
 
@@ -222,31 +220,7 @@ annotations may appear in the rendered PDF, but there is no interactive comment,
 form or annotation editor. Password-protected PDFs support an initial configured
 password and an interactive password prompt.
 
-Modern browsers with module workers and PDF.js support are required. The integration
-test covers Chrome; other browsers have not yet been verified for this component.
-
-## Verification
-
-Start a static server, install Playwright in your development environment and run:
-
-```sh
-python3 -m http.server 8765 --bind 127.0.0.1
-# In another terminal:
-npm install --no-save --package-lock=false playwright
-npx playwright install chromium
-node --test test/viewer.test.mjs
-```
-
-Optional environment variables: `VIEWER_URL` (server URL), `PLAYWRIGHT_PATH`
-(Playwright module location), `CHROME_PATH` (installed browser executable).
-The browser test covers rendering, navigation, page bounds, text selection,
-internal links, download, disabled options, responsive fitting, extension events,
-missing files, restart and cleanup. It also covers arrow keys, both demos, password
-retries/cancellation, session reuse and invalid cached passwords. Screenshots
-`pdf-viewer-desktop.png` and `pdf-viewer-mobile.png` are written to the system temp directory.
-The test deliberately requests a missing PDF, so its HTTP 404 is expected.
-It uses a fresh browser context; existing session passwords in your regular browser
-do not affect the test. Test dependencies are only for development, not the ZIP demo.
+Modern browsers with module workers and PDF.js support are required.
 
 ## License
 

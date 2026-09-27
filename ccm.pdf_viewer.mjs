@@ -4,10 +4,11 @@
  * @author André Kless <andre.kless@web.de>
  * @copyright 2026 André Kless
  * @license MIT
+ * @version 1.0.0
  */
 export const component = {
   name: "pdf_viewer",
-  ccm: "././libs/framework/ccm.js",
+  ccm: "././libs/framework/ccm-28.0.0.min.js",
   config: {
     /** PDF.js display API; keep it on the same version as the worker and auxiliary resources. */
     pdfjs: ["ccm.load", "././libs/pdfjs/pdf.min.mjs"],
