@@ -2,7 +2,11 @@
 
 A buildless ccmjs component for displaying one PDF page at a time, powered by
 locally bundled **PDF.js 6.3.289**. Includes previous/next navigation, direct page
-entry, zoom, optional links, text selection and download.
+entry, a toggleable thumbnail overview, zoom, optional links, text selection and download.
+
+The working source prepares **v1.1.0**, adding the thumbnail overview. The CDN
+example below continues to use the published **v1.0.0**, which does not include
+this feature; update its URL and SRI hash together after publishing v1.1.0.
 
 With focus inside the viewer, use **Left/Right arrow keys** to move to the previous
 or next page. Click the PDF area or focus it with Tab first. Input fields and
@@ -82,6 +86,8 @@ Configuration is also documented directly in `ccm.pdf_viewer.mjs`.
 | `download` | `true` | Show the download button and enable `downloadPdf()`. |
 | `textSelection` | `true` | Allow selection/copying through PDF.js's text layer. |
 | `navigation` | `true` | Show page controls and enable arrow-key navigation. Set to `false` when an embedding component controls the sequence. `goToPage()` remains available. |
+| `thumbnails` | `true` | Offer a thumbnail overview and toolbar toggle. Requires `navigation: true`. Clicking a preview navigates to that page. |
+| `thumbnailsOpen` | `false` | Open the overview initially on each `start()`. Both demo configurations use `true`. |
 | `page` | `1` | Initial page, clamped to the document's range. |
 | `zoom` | `"page-width"` | Fit available width, or a number between `0.25` and `4`. `1` means 100%. |
 | `filename` | `"document.pdf"` | Suggested filename for downloading the original PDF. |
@@ -90,8 +96,31 @@ Configuration is also documented directly in `ccm.pdf_viewer.mjs`.
 | `pdfjs`, `css`, `worker`, `cMaps`, `fonts`, `wasm` | Bundled resources | Override dependency locations if needed; keep API and worker versions identical. |
 
 Fit-to-width follows container resizing, bounded by the same 25–400% zoom range.
-Large pages scroll inside the component. Only one page canvas is displayed;
+Large pages scroll inside the component. Only one full-size page canvas is displayed;
 raster resolution is capped at 16 megapixels and twice the CSS resolution.
+
+## Slide overview
+
+Choose **Slide overview** in the English demo (or **Folienübersicht** with default
+labels) to show or hide the previews. The current page is highlighted; clicking a
+preview uses `goToPage()` and emits the usual `page` extension event. Page numbers,
+arrow keys, internal links and API navigation keep the highlight synchronized.
+Preview buttons also support keyboard focus and Enter/Space activation.
+
+The overview sits beside the page in wide containers and becomes a horizontally
+scrollable strip above it at container widths of 600px or less. Fit-to-width reacts
+when the overview opens or closes. Numeric zoom remains unchanged.
+
+Only visible and nearby previews are rendered, one at a time. Small canvases are
+cached, with off-screen canvases evicted above 24 entries; currently visible
+previews are retained. Closing the overview pauses rendering; restarting or
+destroying the viewer cancels outstanding preview work and releases the cache.
+A failed preview keeps its page button usable. Password-protected documents use
+the already unlocked document and do not prompt separately for thumbnails.
+
+Set `thumbnails: false` to remove the overview entirely. `navigation: false` also
+disables it, so embedding applications can continue to control page progression.
+The `onLink` callback still applies only to links inside the PDF.
 
 `download: false` disables the viewer's download action, not browser access to
 the original PDF. Similarly, disabling selection is not copy protection.

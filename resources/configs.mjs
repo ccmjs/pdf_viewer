@@ -6,6 +6,7 @@
 export const demo = {
   pdf: "././resources/demo.pdf",
   filename: "demo.pdf",
+  thumbnailsOpen: true,
   labels: {
     viewer: "PDF Viewer", previous: "Previous", next: "Next", page: "Page", of: "of",
     zoomOut: "Zoom out", zoomIn: "Zoom in", fit: "Fit to width", download: "Download",
@@ -16,6 +17,7 @@ export const demo = {
     passwordLabel: "Password", unlock: "Open PDF", cancel: "Cancel",
     passwordCancelled: "Opening the PDF was cancelled.",
     invalidPage: "Please enter a valid page number.", link: "Link in PDF",
+    thumbnails: "Slide overview", thumbnailError: "Preview unavailable",
   },
 };
 

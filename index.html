@@ -29,7 +29,7 @@
       const protectedDemo = new URLSearchParams(location.search).get("demo") === "protected";
       document.querySelector("#password-hint").hidden = !protectedDemo;
       // start() stays pending while the protected demo waits for a password.
-      await ccm.start("./ccm.pdf_viewer.mjs",
+      ccm.start("./ccm.pdf_viewer.mjs",
         ["ccm.load", `./resources/configs.mjs#${protectedDemo ? "protectedDemo" : "demo"}`],
         document.querySelector("#viewer"));
     } catch (error) {

@@ -20,7 +20,7 @@
     box-sizing: border-box;
   }
 
-  .toolbar [hidden] { display: none !important; }
+  [hidden] { display: none !important; }
 
   .toolbar {
     display: flex;
@@ -80,7 +80,8 @@
   }
 
   /* Preserve a visible keyboard focus indicator on controls, the PDF area and links. */
-  .toolbar :focus-visible, .password-form :focus-visible, .viewport:focus-visible, .pdf-link:focus-visible {
+  .toolbar :focus-visible, .password-form :focus-visible, .viewport:focus-visible,
+  .pdf-link:focus-visible, .thumbnail:focus-visible {
     outline: 3px solid #2463ce;
     outline-offset: 2px;
   }
@@ -114,7 +115,92 @@
     button { cursor: pointer; }
   }
 
+  /* The page defines the row height; the overview scrolls independently within that height. */
+  .viewer-content {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+
+    @container pdf-viewer (max-width: 600px) {
+      flex-direction: column;
+    }
+  }
+
+  .thumbnails {
+    flex: 0 0 180px;
+    contain: size;
+    overflow: auto;
+    max-height: 80vh;
+    padding: 12px;
+    border-right: 1px solid #dce2e9;
+    background: #eaf0f6;
+
+    /* A horizontal filmstrip leaves room for the main page in narrow embedding containers. */
+    @container pdf-viewer (max-width: 600px) {
+      display: flex;
+      gap: 8px;
+      flex-basis: 194px;
+      border-right: 0;
+      border-bottom: 1px solid #dce2e9;
+    }
+  }
+
+  .thumbnail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 144px;
+    flex: 0 0 144px;
+    margin: 0 auto 8px;
+    padding: 5px;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    &:hover:not([aria-disabled="true"]) { background: #dce8fc; }
+
+    &[aria-current="page"] {
+      border-color: #2463ce;
+      background: #dce8fc;
+    }
+
+    &[aria-disabled="true"] { cursor: default; }
+
+    /* All page formats share a stable slot, even before their PDF dimensions are loaded. */
+    .thumbnail-image {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 128px;
+      height: 144px;
+      flex: 0 0 144px;
+      font-size: 12px;
+      background: #ffffff80;
+
+      canvas {
+        display: block;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        box-shadow: 0 1px 4px #172b4330;
+      }
+    }
+
+    .thumbnail-number { font-variant-numeric: tabular-nums; }
+
+    @container pdf-viewer (max-width: 600px) {
+      margin: 0;
+      .thumbnail-image { height: 120px; flex-basis: 120px; }
+    }
+  }
+
   .viewport {
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: auto;
     /* Reserve vertical scrollbar space before the first fit-to-width measurement. */
     scrollbar-gutter: stable;
@@ -122,6 +208,10 @@
     min-height: 160px;
     /* Keep side padding in sync with render()'s 32px width deduction. */
     padding: 16px;
+
+    @container pdf-viewer (max-width: 600px) {
+      flex: 0 1 auto;
+    }
   }
 
   .pdf-page {

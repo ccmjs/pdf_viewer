@@ -1,10 +1,10 @@
 /**
- * Single-page PDF viewer with optional links, text selection and download.
+ * Single-page PDF viewer with optional thumbnails, links, text selection and download.
  *
  * @author André Kless <andre.kless@web.de>
  * @copyright 2026 André Kless
  * @license MIT
- * @version 1.0.0
+ * @version 1.1.0
  */
 export const component = {
   name: "pdf_viewer",
@@ -36,6 +36,10 @@ export const component = {
     page: 1,
     /** Show page controls and enable arrow-key navigation (embedding apps can own navigation). */
     navigation: true,
+    /** Offer a toggleable thumbnail overview; requires navigation to be enabled. */
+    thumbnails: true,
+    /** Initially expand the overview on each start; otherwise retain the full page width. */
+    thumbnailsOpen: false,
     /** "page-width" or a number from 0.25 to 4 (1 = 100%). */
     zoom: "page-width",
     /** Suggested download filename. */
@@ -50,6 +54,7 @@ export const component = {
       passwordLabel: "Passwort", unlock: "PDF öffnen", cancel: "Abbrechen",
       passwordCancelled: "Das Öffnen des PDFs wurde abgebrochen.",
       invalidPage: "Bitte eine gültige Seitenzahl eingeben.", link: "Link im PDF",
+      thumbnails: "Folienübersicht", thumbnailError: "Vorschau nicht verfügbar",
     },
     /** Functions or `["ccm.load", "./extensions.mjs#name"]`, called sequentially with `{ app, type }`. */
     extensions: [],
@@ -63,6 +68,9 @@ export const component = {
 
     /** Watches the viewport width to update fit-to-width rendering. */
     let observer;
+
+    /** Document-local thumbnail queue, visibility observer and bounded canvas cache. */
+    let previews;
 
     /** Current action promise, awaited by `destroy()` before releasing resources. */
     let active;
@@ -179,6 +187,7 @@ export const component = {
         zoom: validZoom(this.zoom),
         scale: 1,
       };
+      buildThumbnails();
       await this.emit("loaded");
       let lastWidth = ui.viewport.clientWidth;
       // Height changes while swapping pages must not start a resize/render feedback loop.
@@ -300,6 +309,8 @@ export const component = {
       observer?.disconnect();
       observer = null;
       resizePending = false;
+      // Cancel and settle background raster work before disposing its PDF.js document.
+      await releaseThumbnails();
       if (loadingTask) await loadingTask.destroy();
       loadingTask = document = null;
       for (const [url, timer] of downloads) { clearTimeout(timer); URL.revokeObjectURL(url); }
@@ -367,7 +378,7 @@ export const component = {
         ui.root.setAttribute("aria-busy", "true");
         updatePassword(password);
       });
-      ui.viewport.before(form);
+      ui.content.before(form);
       input.focus();
     };
 
@@ -384,6 +395,11 @@ export const component = {
         toolbar.append(element);
         return element;
       };
+      const overview = button(this.labels.thumbnails, async () => {
+        setThumbnailsOpen(ui.thumbnails.hidden);
+      });
+      overview.hidden = !this.thumbnails || !this.navigation;
+      overview.setAttribute("aria-expanded", "false");
       const previous = button(this.labels.previous, () => this.goToPage(this.state.page - 1));
       const form = node("form", "page-form");
       const label = node("label", "", this.labels.page + " ");
@@ -434,9 +450,18 @@ export const component = {
         viewport.focus({ preventScroll: true });
         handle(this.goToPage(page));
       });
-      root.append(toolbar, status, viewport);
+      const content = node("div", "viewer-content");
+      const thumbnails = node("nav", "thumbnails");
+      // A unique relationship also works for several instances without Shadow DOM.
+      thumbnails.id = `pdf-thumbnails-${++overviewId}`;
+      thumbnails.setAttribute("aria-label", this.labels.thumbnails);
+      thumbnails.hidden = true;
+      overview.setAttribute("aria-controls", thumbnails.id);
+      content.append(thumbnails, viewport);
+      root.append(toolbar, status, content);
       this.element.replaceChildren(root);
-      ui = { root, toolbar, previous, next, input, count, zoom, out, plus, viewport, status };
+      ui = { root, toolbar, previous, next, input, count, zoom, out, plus, viewport, status,
+        content, thumbnails, overview };
       updateControls();
     };
 
@@ -445,6 +470,8 @@ export const component = {
       if (!ui) return;
       const disabled = this.gui.busy || !this.state;
       for (const control of ui.toolbar.querySelectorAll("button, input")) control.disabled = disabled;
+      // Keep focus on a thumbnail during navigation; run() ignores activation while busy.
+      for (const entry of previews?.entries || []) entry.button.setAttribute("aria-disabled", String(disabled));
       ui.root.setAttribute("aria-busy", String(this.gui.busy));
       if (!this.state) return;
       ui.previous.disabled = disabled || this.state.page === 1;
@@ -455,6 +482,154 @@ export const component = {
       ui.input.max = this.state.pages;
       ui.count.textContent = ` ${this.labels.of} ${this.state.pages}`;
       ui.zoom.textContent = `${Math.round(this.state.scale * 100)} %`;
+    };
+
+    /** Create lightweight page buttons; only visible/nearby pages acquire a raster preview. */
+    const buildThumbnails = () => {
+      if (!this.thumbnails || !this.navigation) return;
+      const session = previews = {
+        source: document, entries: [], visible: new Set(), cache: new Map(),
+        observer: null, running: null, task: null, stopped: false, open: false, current: null,
+      };
+      // getPage() may wait for a network range request; cleanup must not wait for that request.
+      session.loadingStopped = new Promise(resolve => { session.stopLoading = resolve; });
+      const fragment = window.document.createDocumentFragment();
+      for (let number = 1; number <= document.numPages; number++) {
+        const button = node("button", "thumbnail");
+        button.type = "button";
+        button.setAttribute("aria-label", `${this.labels.page} ${number}`);
+        button.setAttribute("aria-disabled", "true");
+        const frame = node("span", "thumbnail-image");
+        frame.setAttribute("aria-hidden", "true");
+        button.append(frame, node("span", "thumbnail-number", number));
+        button.addEventListener("click", () => handle(this.goToPage(number)));
+        const entry = { number, button, frame, failed: false };
+        session.entries.push(entry);
+        fragment.append(button);
+      }
+      ui.thumbnails.append(fragment);
+      session.observer = new IntersectionObserver((entries) => {
+        if (session.stopped || !session.open) return;
+        for (const observed of entries) {
+          const entry = session.entries[Number(observed.target.dataset.page) - 1];
+          if (observed.isIntersecting) session.visible.add(entry);
+          else session.visible.delete(entry);
+        }
+        trimThumbnails(session);
+        renderThumbnails(session);
+      }, { root: ui.thumbnails, rootMargin: "120px" });
+      for (const entry of session.entries) entry.button.dataset.page = entry.number;
+      setThumbnailsOpen(!!this.thumbnailsOpen);
+      selectThumbnail();
+    };
+
+    /** Toggle only the overview; the viewport ResizeObserver takes care of fit-to-width. */
+    const setThumbnailsOpen = (open) => {
+      if (!previews) return;
+      previews.open = open;
+      ui.thumbnails.hidden = !open;
+      ui.overview.setAttribute("aria-expanded", String(open));
+      if (open) {
+        for (const entry of previews.entries) previews.observer.observe(entry.button);
+        revealThumbnail();
+      } else {
+        previews.observer.disconnect();
+        previews.visible.clear();
+        previews.task?.cancel();
+      }
+    };
+
+    /** Keep the active page visible by scrolling this pane only, never the embedding document. */
+    const revealThumbnail = () => {
+      if (!previews?.open) return;
+      const button = previews.entries[this.state.page - 1].button;
+      const pane = ui.thumbnails.getBoundingClientRect();
+      const item = button.getBoundingClientRect();
+      const offset = (start, end, low, high) => start < low ? start - low : end > high ? end - high : 0;
+      ui.thumbnails.scrollBy({
+        left: offset(item.left, item.right, pane.left, pane.right),
+        top: offset(item.top, item.bottom, pane.top, pane.bottom),
+      });
+    };
+
+    /** Synchronize selection for every navigation path, including links and the public API. */
+    const selectThumbnail = () => {
+      if (!previews || previews.current === this.state.page) return;
+      if (previews.current) previews.entries[previews.current - 1].button.removeAttribute("aria-current");
+      previews.current = this.state.page;
+      previews.entries[previews.current - 1].button.setAttribute("aria-current", "page");
+      revealThumbnail();
+    };
+
+    /** Keep at most 24 cached rasters where possible; never evict a currently visible preview. */
+    const trimThumbnails = (session) => {
+      for (const [entry, canvas] of session.cache) {
+        if (session.cache.size <= 24) break;
+        if (session.visible.has(entry)) continue;
+        canvas.remove();
+        canvas.width = canvas.height = 0;
+        session.cache.delete(entry);
+      }
+    };
+
+    /**
+     * Render sequentially in the background, independently of the main-page action lock.
+     * Fixed-size placeholders avoid scroll jumps. A failed preview retains a usable page button.
+     */
+    const renderThumbnails = (session) => {
+      if (session.running || session.stopped || !session.open) return;
+      session.running = (async () => {
+        while (!session.stopped && session.open) {
+          const entry = [...session.visible].find(entry => !entry.failed && !session.cache.has(entry));
+          if (!entry) break;
+          let canvas;
+          try {
+            const page = await Promise.race([session.source.getPage(entry.number), session.loadingStopped]);
+            if (session.stopped || !session.open) break;
+            if (!session.visible.has(entry)) continue;
+            const base = page.getViewport({ scale: 1 });
+            const viewport = page.getViewport({ scale: Math.min(128 / base.width, 144 / base.height) });
+            const ratio = Math.min(window.devicePixelRatio || 1, 2);
+            canvas = node("canvas");
+            canvas.width = Math.max(1, Math.floor(viewport.width * ratio));
+            canvas.height = Math.max(1, Math.floor(viewport.height * ratio));
+            canvas.style.width = `${viewport.width}px`;
+            canvas.style.height = `${viewport.height}px`;
+            session.task = page.render({ canvasContext: canvas.getContext("2d"), viewport,
+              transform: [ratio, 0, 0, ratio, 0, 0], annotationMode: this.pdfjs.AnnotationMode.ENABLE });
+            await session.task.promise;
+            if (!session.stopped && session.open) {
+              entry.frame.replaceChildren(canvas);
+              session.cache.set(entry, canvas);
+              trimThumbnails(session);
+              canvas = null;
+            }
+          } catch (error) {
+            if (!session.stopped && error.name !== "RenderingCancelledException") {
+              entry.failed = true;
+              entry.frame.textContent = this.labels.thumbnailError;
+            }
+          } finally {
+            session.task = null;
+            if (canvas) canvas.width = canvas.height = 0;
+          }
+        }
+      })().finally(() => { session.running = null; });
+    };
+
+    /** Retire the session before awaiting it so stale work cannot write into a restarted viewer. */
+    const releaseThumbnails = async () => {
+      const session = previews;
+      previews = null;
+      if (!session) return;
+      session.stopped = true;
+      session.stopLoading();
+      session.observer.disconnect();
+      session.task?.cancel();
+      await session.running;
+      for (const canvas of session.cache.values()) canvas.width = canvas.height = 0;
+      session.cache.clear();
+      session.visible.clear();
     };
 
     /**
@@ -527,6 +702,7 @@ export const component = {
       ui.viewport.replaceChildren(sheet);
       ui.viewport.scrollTo(0, 0);
       Object.assign(this.state, { page: number, zoom, scale });
+      selectThumbnail();
       ui.status.textContent = "";
       await this.emit("render");
     };
@@ -557,3 +733,6 @@ export const component = {
     };
   },
 };
+
+/** Unique overview IDs for instances sharing a DOM, including HTTP-only local installations. */
+let overviewId = 0;
