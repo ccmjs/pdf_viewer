@@ -56,7 +56,7 @@ Dependencies are declared via `ccm.load`; no npm install or build is needed to u
 ></script>
 <script type="module">
   const viewer = await ccm.start(
-      "https://cdn.jsdelivr.net/gh/ccmjs/pdf_viewer@v1.0.0/ccm.pdf_viewer-1.0.0.min.mjs#sha384-1NwNCUojyNg7BPq0Odf5LRpb3kJ1qlCXpZHd1vHHHYNzm4AONSwujk5CH5TFcDlE",
+      "https://cdn.jsdelivr.net/gh/ccmjs/pdf_viewer@v1.1.0/ccm.pdf_viewer-1.1.0.min.mjs#sha384-h/Tddha/iX7T/AuKwYFOJwxb1fASNwPtN1JiTSVJBt762c2Wyt/uLK3jHVgpaQ8A",
       {},
       document.body
   );
